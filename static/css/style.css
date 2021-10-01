@@ -1,0 +1,7 @@
+body {
+  background-color: aliceblue;
+}
+
+.not-visible {
+  display: none;
+}
