@@ -3,13 +3,31 @@ from django.shortcuts import render
 from .models import Post
 from django.http import JsonResponse
 
+from .forms import PostForm
+
+from profiles.models import Profile
+
 
 def post_list_and_create_view(request):
-    qs = Post.objects.all()
-    return render(request, "posts/main.html", {"qs": qs})
+    form = PostForm(request.POST or None)
+
+    # qs = Post.objects.all()
+    if request.is_ajax:
+        if form.is_valid():
+            author = Profile.objects.get(user=request.user)
+            instance = form.save(commit=False)
+            instance.author = author
+            instance.save()
+    context = {"form": form}
+    return render(request, "posts/main.html", context)
 
 
 def load_post(request, num_posts):
+    visible = 1
+    upper = num_posts
+    lower = upper - visible
+    size = Post.objects.all().count()
+
     qs = Post.objects.all()
     data = []
     for obj in qs:
@@ -17,11 +35,14 @@ def load_post(request, num_posts):
             'id': obj.id,
             'title': obj.title,
             'body': obj.body,
+            'liked': True if request.user in obj.liked.all() else False,
+            'count': obj.like_count,
             'author': obj.author.user.username
         }
         data.append(item)
     return JsonResponse({
-        "data": data
+        "data": data[lower:upper],
+        'size': size
     })
 
 
@@ -29,3 +50,17 @@ def hello_world_view(request):
     return JsonResponse({
         "text": "hello world"
     })
+
+
+def like_unlike_view(request):
+    if request.is_ajax():
+        pk = request.POST.get('pk')
+        obj = Post.objects.get(pk=pk)
+        if request.user in obj.liked.all():
+            liked = False
+            obj.liked.remove(request.user)
+        else:
+            liked = True
+            obj.liked.add(request.user)
+
+        return JsonResponse({'liked': liked, 'count': obj.like_count})
